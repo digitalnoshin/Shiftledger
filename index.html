@@ -40,6 +40,7 @@ svg text{font-family:inherit}.vl{font-size:9px;fill:var(--mut)}.lb{font-size:10p
 .tip{background:var(--c2);border-radius:14px;padding:12px;font-size:14px;margin-top:10px}
 #toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 18px;border-radius:99px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s}
 #toast.show{opacity:1}
+textarea{display:block;width:100%;border-radius:14px;border:1px solid var(--line);background:var(--inp);color:var(--tx);padding:12px;font:inherit;resize:vertical}
 [hidden]{display:none!important}
 </style></head><body>
 <main>
@@ -98,10 +99,13 @@ document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.que
 ['new','hist','ins'].forEach(s=>$(s).hidden=s!=b.dataset.t);if(b.dataset.t=='hist')hist();if(b.dataset.t=='ins')ins()});
 let pend=null;
 function hist(){const el=$('hist');
-if(!S.length){el.innerHTML='<div class="card"><h2>History</h2><p class="mut">No shifts yet. Save your first one from the New shift tab.</p></div>';return}
+if(!S.length){el.innerHTML='<div class="card"><h2>History</h2><p class="mut">No shifts yet. Save your first one from the New shift tab.</p></div>'+bk();bkw();return}
 const rows=S.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id).map(s=>`<div class="row"><div><b>${fd(s.date)}</b><span class="mut">${s.h}h · ${s.o} orders · ${s.km} km</span></div><div class="r"><b class="${s.net<0?'ng':'ps'}">${inr(s.net)}</b><span class="mut">${inr(s.net/s.h)}/hr</span></div><button data-d="${s.id}">${pend==s.id?'Sure?':'✕'}</button></div>`).join('');
-el.innerHTML='<div class="card"><h2>History</h2>'+rows+(ok?'':'<p class="mut">Storage is blocked here, so shifts will not be kept after you close this page.</p>')+'</div>';
+el.innerHTML='<div class="card"><h2>History</h2>'+rows+(ok?'':'<p class="mut">Storage is blocked here, so shifts will not be kept after you close this page.</p>')+'</div>'+bk();bkw();
 el.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{const id=+b.dataset.d;if(pend==id){S=S.filter(s=>s.id!=id);pend=null;persist();hist();toast('Deleted')}else{pend=id;hist();setTimeout(()=>{if(pend==id){pend=null;hist()}},3000)}})}
+const bk=()=>`<div class="card"><h2>Backup</h2><p class="mut">Your shifts live only on this phone. Copy a backup now and then, and paste it somewhere safe like Notes.</p><button class="btn alt" id="bc">Copy backup</button><label for="br">Restore from backup</label><textarea id="br" rows="3" placeholder="Paste your backup here"></textarea><button class="btn alt" id="bs">Restore</button></div>`;
+function bkw(){$('bc').onclick=async()=>{const t=JSON.stringify({v:1,S,C});try{await navigator.clipboard.writeText(t);toast('Backup copied ✓')}catch(e){$('br').value=t;$('br').select();toast('Select all and copy the text')}};
+$('bs').onclick=()=>{try{const d=JSON.parse($('br').value.trim());if(!Array.isArray(d.S))throw 0;const ids=new Set(S.map(x=>x.id));let n=0;d.S.forEach(x=>{if(x&&x.date&&x.h>0&&Number.isFinite(x.net)&&!ids.has(x.id)){S.push(x);ids.add(x.id);n++}});persist();hist();toast(n+' shift'+(n==1?'':'s')+' restored')}catch(e){toast('That backup text looks wrong')}}}
 function bars(items,hi,every){const W=340,top=22,bot=150,n=items.length,gap=n>12?3:8,bw=(W-gap*(n+1))/n;
 const mn=Math.min(0,...items.map(i=>i.v)),mx=Math.max(0,...items.map(i=>i.v)),rg=(mx-mn)||1,y=v=>bot-(v-mn)/rg*(bot-top);
 let s=`<svg viewBox="0 0 ${W} 180" width="100%" role="img">`;
