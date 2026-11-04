@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ShiftLedger</title><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ShiftLedger">
+<style>
+:root{color-scheme:light;--bg:#f4f6fb;--card:#fff;--c2:#eef1f8;--line:#d6dcea;--tx:#111827;--mut:#5b6478;--ac:#1c8f56;--neg:#c0392b;--btn:#3b5bdb;--btnt:#fff;--inp:#f8f9fd;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#0b1020;--card:#141c2f;--c2:#1c2740;--line:#27324d;--tx:#eef2ff;--mut:#97a3c0;--ac:#7dd3a0;--neg:#f08a8a;--btn:#a9bffb;--btnt:#0b1020;--inp:#0d1324}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#0b1020;--card:#141c2f;--c2:#1c2740;--line:#27324d;--tx:#eef2ff;--mut:#97a3c0;--ac:#7dd3a0;--neg:#f08a8a;--btn:#a9bffb;--btnt:#0b1020;--inp:#0d1324}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif}
+main{max-width:520px;margin:0 auto;padding:20px 16px 40px}
+header{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0 16px}
+h1{margin:0;font-size:28px}h2{margin:0 0 12px;font-size:20px}
+.mut{color:var(--mut);font-size:14px}
+.pill{background:color-mix(in srgb,var(--ac) 18%,transparent);color:var(--ac);font-weight:700;font-size:12px;letter-spacing:.1em;padding:6px 12px;border-radius:99px}
+.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:16px}
+.tabs button{padding:12px 4px;border-radius:14px;border:1px solid var(--line);background:transparent;color:var(--mut);font-weight:600;font-size:15px}
+.tabs button.on{background:var(--c2);color:var(--tx);border-color:var(--btn)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;margin-bottom:14px}
+.hero small{letter-spacing:.14em;font-weight:700;color:var(--mut);font-size:12px}
+.big{font-size:42px;font-weight:800;color:var(--ac);margin:4px 0}
+.big.ng,.ng{color:var(--neg)}.ps{color:var(--ac)}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:end}.g2>div{min-width:0}.g2 label{display:flex;align-items:flex-end;min-height:2.5em;line-height:1.2}
+label{display:block;color:var(--mut);font-weight:600;font-size:14px;margin:12px 0 6px}
+input[type=date],input[type=time]{line-height:48px;text-align:left}input::-webkit-date-and-time-value{text-align:left;margin:0}input{display:block;margin:0;-webkit-appearance:none;appearance:none;width:100%;min-width:0;max-width:100%;height:48px;border-radius:14px;border:1px solid var(--line);background:var(--inp);color:var(--tx);padding:0 14px;font:inherit}
+input:focus{outline:2px solid var(--btn)}
+.st{background:var(--c2);border-radius:14px;padding:12px}
+.st span{font-size:13px;color:var(--mut)}.st b{display:block;font-size:clamp(17px,5.2vw,22px);margin-top:2px;overflow-wrap:anywhere}
+.btn{width:100%;height:50px;border-radius:14px;border:0;background:var(--btn);color:var(--btnt);font-weight:700;font-size:17px;margin-top:14px}
+.btn.alt{background:var(--c2);color:var(--tx);border:1px solid var(--line);margin-top:10px}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border:0}.row span{display:block}.row .r{text-align:right}
+.row button{border:1px solid var(--line);background:transparent;color:var(--mut);border-radius:10px;padding:8px 10px;font-size:13px}
+.row button.sure{color:var(--neg);border-color:var(--neg)}
+.seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:10px}
+.seg button{padding:9px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--mut);font-weight:600}
+.seg button.on{background:var(--c2);color:var(--tx)}
+svg text{font-family:inherit}.vl{font-size:9px;fill:var(--mut)}.lb{font-size:10px;fill:var(--mut)}
+.tip{background:var(--c2);border-radius:14px;padding:12px;font-size:14px;margin-top:10px}
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 18px;border-radius:99px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.show{opacity:1}
+[hidden]{display:none!important}
+</style></head><body>
+<main>
+<header><div><h1>ShiftLedger</h1><div class="mut">Your personal delivery earnings tracker</div></div><span class="pill">PRIVATE</span></header>
+<nav class="tabs"><button data-t="new" class="on">New shift</button><button data-t="hist">History</button><button data-t="ins">Insights</button></nav>
+
+<section id="new">
+<div class="card hero"><small>ESTIMATED NET SHIFT PROFIT</small><div class="big" id="net">₹0.00</div><div class="mut">Gross earnings minus fuel and other costs</div></div>
+<div class="card"><h2>Shift details</h2>
+<label for="date">Date</label><input type="date" id="date">
+<div class="g2"><div><label for="start">Start time</label><input type="time" id="start"></div><div><label for="hrs">Hours worked</label><input id="hrs" type="number" inputmode="decimal" placeholder="e.g. 4"></div></div>
+<div class="g2"><div><label for="ord">Orders completed</label><input id="ord" type="number" inputmode="numeric" placeholder="e.g. 6"></div><div><label for="km">Distance travelled (km)</label><input id="km" type="number" inputmode="decimal" placeholder="e.g. 30"></div></div>
+<p class="mut" style="margin:8px 0 0">Start time is optional, but it powers the best-hours insight.</p>
+<h2 style="margin-top:22px">Earnings (₹)</h2>
+<div class="g2"><div><label for="oe">Order earnings</label><input id="oe" type="number" inputmode="decimal" placeholder="0"></div><div><label for="inc">Incentives / bonus</label><input id="inc" type="number" inputmode="decimal" placeholder="0"></div></div>
+<label for="tip">Customer tips</label><input id="tip" type="number" inputmode="decimal" placeholder="0">
+<h2 style="margin-top:22px">Fuel and expenses</h2>
+<div class="g2"><div><label for="pp">Petrol price (₹/L)</label><input id="pp" type="number" inputmode="decimal"></div><div><label for="mil">Bike mileage (km/L)</label><input id="mil" type="number" inputmode="decimal"></div></div>
+<div class="g2"><div><label for="mt">Maintenance allowance (₹)</label><input id="mt" type="number" inputmode="decimal"></div><div><label for="ox">Other expenses (₹)</label><input id="ox" type="number" inputmode="decimal" placeholder="0"></div></div>
+<div class="g2" style="margin-top:16px">
+<div class="st"><span>Gross earnings</span><b id="g">₹0.00</b></div><div class="st"><span>Fuel expense</span><b id="f">₹0.00</b></div>
+<div class="st"><span>Total expenses</span><b id="e">₹0.00</b></div><div class="st"><span>Net profit / hour</span><b id="ph">₹0.00</b></div></div>
+<button class="btn" id="save">Save this shift</button><button class="btn alt" id="clr">Clear form</button>
+<p class="mut">Fuel = distance ÷ mileage × petrol price. Petrol, mileage and maintenance are remembered for next time.</p>
+</div></section>
+
+<section id="hist" hidden></section>
+<section id="ins" hidden></section>
+</main><div id="toast"></div>
+<script>
+const $=i=>document.getElementById(i),N=v=>{v=parseFloat(v);return isFinite(v)?v:0};
+const inr=(v,d=0)=>(v<0?'-':'')+'₹'+Math.abs(v).toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
+const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const pd=s=>{const[a,b,c]=s.split('-').map(Number);return new Date(a,b-1,c)};
+const fd=s=>pd(s).toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});
+const sh=v=>Math.abs(v)>=1000?(v/1000).toFixed(1)+'k':String(Math.round(v));
+const hn=h=>(h%12||12)+' '+(h<12?'AM':'PM');
+let S=[],C={pp:105,mil:45,mt:20},ok=true,per='d';
+try{S=JSON.parse(localStorage.getItem('sl_s')||'[]');Object.assign(C,JSON.parse(localStorage.getItem('sl_c')||'{}'))}catch(e){ok=false}
+const persist=()=>{try{localStorage.setItem('sl_s',JSON.stringify(S));localStorage.setItem('sl_c',JSON.stringify(C))}catch(e){ok=false}};
+function toast(t){const x=$('toast');x.textContent=t;x.classList.add('show');setTimeout(()=>x.classList.remove('show'),1800)}
+function calc(){const h=N($('hrs').value),km=N($('km').value),pp=N($('pp').value),mil=N($('mil').value);
+const g=N($('oe').value)+N($('inc').value)+N($('tip').value),fuel=mil>0?km/mil*pp:0,ex=fuel+N($('mt').value)+N($('ox').value);
+return{g,fuel,ex,net:g-ex,h,ph:h>0?(g-ex)/h:0}}
+function render(){const c=calc();$('net').textContent=inr(c.net,2);$('net').classList.toggle('ng',c.net<0);
+$('g').textContent=inr(c.g,2);$('f').textContent=inr(c.fuel,2);$('e').textContent=inr(c.ex,2);$('ph').textContent=inr(c.ph,2)}
+function reset(){['start','hrs','ord','km','oe','inc','tip','ox'].forEach(i=>$(i).value='');$('date').value=iso(new Date());render()}
+$('pp').value=C.pp;$('mil').value=C.mil;$('mt').value=C.mt;$('date').value=iso(new Date());render();
+document.querySelectorAll('#new input').forEach(i=>i.addEventListener('input',render));
+$('clr').onclick=reset;
+$('save').onclick=()=>{const c=calc();if(!$('date').value)return toast('Pick a date');if(c.h<=0)return toast('Enter hours worked');
+C={pp:N($('pp').value),mil:N($('mil').value),mt:N($('mt').value)};
+S.push({id:Date.now(),date:$('date').value,start:$('start').value,h:c.h,o:N($('ord').value),km:N($('km').value),g:c.g,fuel:c.fuel,ex:c.ex,net:c.net});
+persist();reset();toast(ok?'Shift saved ✓':'Saved, but this browser blocks storage')};
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x==b));
+['new','hist','ins'].forEach(s=>$(s).hidden=s!=b.dataset.t);if(b.dataset.t=='hist')hist();if(b.dataset.t=='ins')ins()});
+let pend=null;
+function hist(){const el=$('hist');
+if(!S.length){el.innerHTML='<div class="card"><h2>History</h2><p class="mut">No shifts yet. Save your first one from the New shift tab.</p></div>';return}
+const rows=S.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id).map(s=>`<div class="row"><div><b>${fd(s.date)}</b><span class="mut">${s.h}h · ${s.o} orders · ${s.km} km</span></div><div class="r"><b class="${s.net<0?'ng':'ps'}">${inr(s.net)}</b><span class="mut">${inr(s.net/s.h)}/hr</span></div><button data-d="${s.id}">${pend==s.id?'Sure?':'✕'}</button></div>`).join('');
+el.innerHTML='<div class="card"><h2>History</h2>'+rows+(ok?'':'<p class="mut">Storage is blocked here, so shifts will not be kept after you close this page.</p>')+'</div>';
+el.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{const id=+b.dataset.d;if(pend==id){S=S.filter(s=>s.id!=id);pend=null;persist();hist();toast('Deleted')}else{pend=id;hist();setTimeout(()=>{if(pend==id){pend=null;hist()}},3000)}})}
+function bars(items,hi,every){const W=340,top=22,bot=150,n=items.length,gap=n>12?3:8,bw=(W-gap*(n+1))/n;
+const mn=Math.min(0,...items.map(i=>i.v)),mx=Math.max(0,...items.map(i=>i.v)),rg=(mx-mn)||1,y=v=>bot-(v-mn)/rg*(bot-top);
+let s=`<svg viewBox="0 0 ${W} 180" width="100%" role="img">`;
+items.forEach((it,i)=>{const x=gap+i*(bw+gap),y0=y(0),y1=y(it.v),t=Math.min(y0,y1),h=it.v?Math.max(Math.abs(y1-y0),2):0;
+s+=`<rect x="${x}" y="${t}" width="${bw}" height="${h}" rx="3" fill="${it.v<0?'var(--neg)':'var(--ac)'}" opacity="${hi==null||hi==i?1:.45}"/>`;
+if(n<=12&&it.v)s+=`<text class="vl" x="${x+bw/2}" y="${it.v<0?t+h+11:t-4}" text-anchor="middle">${sh(it.v)}</text>`;
+if(i%every==0)s+=`<text class="lb" x="${x+bw/2}" y="172" text-anchor="middle">${it.l}</text>`});
+return s+`<line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="var(--line)"/></svg>`}
+function periods(m){const now=new Date();now.setHours(0,0,0,0);const B=[];
+if(m=='d')for(let i=6;i>=0;i--){const d=new Date(now);d.setDate(d.getDate()-i);B.push({k:iso(d),l:d.toLocaleDateString('en-IN',{weekday:'short'})})}
+else if(m=='w'){const wd=(now.getDay()+6)%7;for(let i=7;i>=0;i--){const d=new Date(now);d.setDate(d.getDate()-wd-i*7);B.push({k:iso(d),l:d.getDate()+'/'+(d.getMonth()+1)})}}
+else for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);B.push({k:iso(d).slice(0,7),l:d.toLocaleDateString('en-IN',{month:'short'})})}
+B.forEach(b=>b.v=0);
+S.forEach(s=>{const d=pd(s.date);let k=s.date;if(m=='w'){const x=new Date(d);x.setDate(x.getDate()-(d.getDay()+6)%7);k=iso(x)}else if(m=='m')k=s.date.slice(0,7);const b=B.find(b=>b.k==k);if(b)b.v+=s.net});return B}
+function hours(){const sm=Array(24).fill(0),w=Array(24).fill(0);
+S.forEach(s=>{if(!s.start||!s.h)return;const[a,b]=s.start.split(':').map(Number),st=a+b/60,en=st+s.h,p=s.net/s.h;
+for(let k=Math.floor(st);k<Math.ceil(en);k++){const o=Math.min(k+1,en)-Math.max(k,st);if(o>0){sm[k%24]+=p*o;w[k%24]+=o}}});
+return sm.map((v,i)=>({l:i==0?'12a':i<12?i+'a':i==12?'12p':(i-12)+'p',v:w[i]?v/w[i]:0,w:w[i],h:i}))}
+function days(){const nm=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],n=Array(7).fill(0),h=Array(7).fill(0);
+S.forEach(s=>{const i=(pd(s.date).getDay()+6)%7;n[i]+=s.net;h[i]+=s.h});return nm.map((l,i)=>({l,v:h[i]?n[i]/h[i]:0,w:h[i]}))}
+const best=a=>{let b=-1;a.forEach((x,i)=>{if(x.w>0&&(b<0||x.v>a[b].v))b=i});return b};
+function ins(){const el=$('ins');
+if(!S.length){el.innerHTML='<div class="card"><h2>Insights</h2><p class="mut">Save a few shifts and your charts will show up here.</p></div>';return}
+const tn=S.reduce((a,s)=>a+s.net,0),th=S.reduce((a,s)=>a+s.h,0),P=periods(per),hd=hours(),dd=days(),bh=best(hd),bd=best(dd);
+const tot=P.reduce((a,b)=>a+b.v,0),ttl={d:'Last 7 days',w:'Last 8 weeks (week starting Monday)',m:'Last 6 months'}[per];
+el.innerHTML=`<div class="card"><h2>Profit</h2><div class="seg">${[['d','Daily'],['w','Weekly'],['m','Monthly']].map(([k,l])=>`<button data-p="${k}" class="${per==k?'on':''}">${l}</button>`).join('')}</div>
+<div class="mut">${ttl}: <b class="${tot<0?'ng':'ps'}">${inr(tot)}</b></div>${bars(P,null,1)}</div>
+<div class="card"><h2>Best hours</h2>${bh<0?'<p class="mut">Add a start time when saving shifts to see this.</p>':bars(hd,bh,3)+`<div class="tip">Best time so far: <b>${hn(hd[bh].h)}</b> at about <b>${inr(hd[bh].v)}/hr</b> net.</div>`}</div>
+<div class="card"><h2>Best days (net per hour)</h2>${bars(dd,bd,1)}${bd<0?'':`<div class="tip">Best day so far: <b>${dd[bd].l}</b> at about <b>${inr(dd[bd].v)}/hr</b> net.</div>`}</div>
+<div class="card"><div class="g2"><div class="st"><span>Total net</span><b class="${tn<0?'ng':'ps'}">${inr(tn)}</b></div><div class="st"><span>Avg net / hour</span><b>${inr(th?tn/th:0)}</b></div><div class="st"><span>Shifts</span><b>${S.length}</b></div><div class="st"><span>Hours worked</span><b>${+th.toFixed(1)}</b></div></div>
+${S.length<10?`<div class="tip">You have ${S.length} shift${S.length>1?'s':''} saved. Best hour and best day get reliable after about 10 or more shifts, so treat them as a rough guide for now.</div>`:''}</div>`;
+el.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{per=b.dataset.p;ins()})}
+</script></body></html>
