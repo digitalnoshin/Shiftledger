@@ -42,10 +42,19 @@ svg text{font-family:inherit}.vl{font-size:9px;fill:var(--mut)}.lb{font-size:10p
 #toast.show{opacity:1}
 textarea{display:block;width:100%;border-radius:14px;border:1px solid var(--line);background:var(--inp);color:var(--tx);padding:12px;font:inherit;resize:vertical}
 .rt{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.2fr) minmax(0,.8fr) minmax(0,.8fr) 34px;gap:6px;align-items:center;margin-bottom:6px}.rt input{height:42px;padding:0 8px;font-size:14px;border-radius:10px}.rt.hd{font-size:12px;font-weight:700;color:var(--mut)}.rt button{height:42px;border:1px solid var(--line);background:transparent;color:var(--mut);border-radius:10px;padding:0}.rt button.sure{color:var(--neg);border-color:var(--neg)}
+.acct{display:flex;align-items:center;gap:10px;margin:-6px 0 12px;font-size:13px;color:var(--mut)}.acct #who{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.acct #st{margin-left:auto;white-space:nowrap}.acct button{border:1px solid var(--line);background:transparent;color:var(--mut);border-radius:10px;padding:6px 10px;font:inherit}
+#auth{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto}
 [hidden]{display:none!important}
 </style></head><body>
 <main>
-<header><div><h1>ShiftLedger</h1><div class="mut">Your personal delivery earnings tracker</div></div><span class="pill">PRIVATE</span></header>
+<header><div><h1>ShiftLedger</h1><div class="mut">Your personal delivery earnings tracker</div></div><span class="pill" id="pill">PRIVATE</span></header>
+<div id="boot" class="mut">Loading…</div>
+<section id="auth" hidden><div class="card"><h2>Log in</h2><p class="mut">Use the same ID and password on every device to see your shifts. There is no password reset, so save your password somewhere safe.</p>
+<label for="uid">ID</label><input id="uid" autocapitalize="none" autocorrect="off" autocomplete="username" placeholder="e.g. noshin">
+<label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" placeholder="At least 6 characters">
+<div class="tip" id="aerr" hidden></div>
+<button class="btn" id="login">Log in</button><button class="btn alt" id="signup">Create account</button></div></section>
+<div id="app" hidden><div class="acct"><span id="who"></span><span id="st"></span><button id="out">Log out</button></div>
 <nav class="tabs"><button data-t="new" class="on">New shift</button><button data-t="rest">Restaurants</button><button data-t="hist">History</button><button data-t="ins">Insights</button></nav>
 
 <section id="new">
@@ -70,8 +79,12 @@ textarea{display:block;width:100%;border-radius:14px;border:1px solid var(--line
 
 <section id="rest" hidden></section>
 <section id="hist" hidden></section>
-<section id="ins" hidden></section>
+<section id="ins" hidden></section></div>
 </main><div id="toast"></div>
+<div id="auth"><div class="card" style="width:100%;max-width:400px;margin:0"><h1>ShiftLedger</h1><p class="mut" id="am">Loading…</p><div id="af" hidden><label for="aid">Your ID</label><input id="aid" autocomplete="username" autocapitalize="none" autocorrect="off" placeholder="e.g. noshin"><label for="apw">Password</label><input id="apw" type="password" autocomplete="current-password" placeholder="At least 6 characters"><p class="mut" id="ae" style="color:var(--neg);min-height:1.4em"></p><button class="btn" id="ali">Log in</button><button class="btn alt" id="acr">Create new account</button></div></div></div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
 const $=i=>document.getElementById(i),N=v=>{v=parseFloat(v);return isFinite(v)?v:0};
 const inr=(v,d=0)=>(v<0?'-':'')+'₹'+Math.abs(v).toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -80,9 +93,16 @@ const pd=s=>{const[a,b,c]=s.split('-').map(Number);return new Date(a,b-1,c)};
 const fd=s=>pd(s).toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});
 const sh=v=>Math.abs(v)>=1000?(v/1000).toFixed(1)+'k':String(Math.round(v));
 const hn=h=>(h%12||12)+' '+(h<12?'AM':'PM');
-let S=[],R=[],C={pp:105,mil:45,mt:20},ok=true,per='d';
-try{S=JSON.parse(localStorage.getItem('sl_s')||'[]');Object.assign(C,JSON.parse(localStorage.getItem('sl_c')||'{}'));R=JSON.parse(localStorage.getItem('sl_r')||'[]')}catch(e){ok=false}
-const persist=()=>{try{localStorage.setItem('sl_s',JSON.stringify(S));localStorage.setItem('sl_c',JSON.stringify(C));localStorage.setItem('sl_r',JSON.stringify(R))}catch(e){ok=false}};
+let D={s:[],r:[]},U=null,pt=null,unsub=null,S=[],R=[],C={pp:105,mil:45,mt:20},ok=true,per='d';
+try{S=JSON.parse(localStorage.getItem('sl_s')||'[]');Object.assign(C,JSON.parse(localStorage.getItem('sl_c')||'{}'));R=JSON.parse(localStorage.getItem('sl_r')||'[]');D=Object.assign(D,JSON.parse(localStorage.getItem('sl_d')||'{}'))}catch(e){ok=false}
+const saveLocal=()=>{try{localStorage.setItem('sl_d',JSON.stringify(D));localStorage.setItem('sl_s',JSON.stringify(S));localStorage.setItem('sl_c',JSON.stringify(C));localStorage.setItem('sl_r',JSON.stringify(R));localStorage.setItem('sl_t',String(Date.now()))}catch(e){ok=false}window.slSync&&window.slSync()};const persist=()=>{saveLocal();push()};
+window.slGet=()=>({S,C,R});
+window.slStatus=t=>{$('pill').textContent=t};
+window.slSet=(d,t)=>{S=d.S||[];R=d.R||[];C=Object.assign({pp:105,mil:45,mt:20},d.C||{});
+try{localStorage.setItem('sl_s',JSON.stringify(S));localStorage.setItem('sl_c',JSON.stringify(C));localStorage.setItem('sl_r',JSON.stringify(R));localStorage.setItem('sl_t',String(t))}catch(e){}
+$('pp').value=C.pp;$('mil').value=C.mil;$('mt').value=C.mt;
+const a=['new','rest','hist','ins'].find(x=>!$(x).hidden);if(a=='rest')rest();if(a=='hist')hist();if(a=='ins')ins()};
+setTimeout(()=>{if(!window.slReady&&localStorage.getItem('sl_uid')){$('auth').hidden=true;slStatus('OFFLINE')}},4000);
 function toast(t){const x=$('toast');x.textContent=t;x.classList.add('show');setTimeout(()=>x.classList.remove('show'),1800)}
 function calc(){const h=N($('hrs').value),km=N($('km').value),pp=N($('pp').value),mil=N($('mil').value);
 const g=N($('oe').value)+N($('inc').value)+N($('tip').value),fuel=mil>0?km/mil*pp:0,ex=fuel+N($('mt').value)+N($('ox').value);
@@ -94,7 +114,7 @@ $('pp').value=C.pp;$('mil').value=C.mil;$('mt').value=C.mt;$('date').value=iso(n
 document.querySelectorAll('#new input').forEach(i=>i.addEventListener('input',render));
 $('clr').onclick=reset;
 $('save').onclick=()=>{const c=calc();if(!$('date').value)return toast('Pick a date');if(c.h<=0)return toast('Enter hours worked');
-C={pp:N($('pp').value),mil:N($('mil').value),mt:N($('mt').value)};
+C={pp:N($('pp').value),mil:N($('mil').value),mt:N($('mt').value),u:Date.now()};
 S.push({id:Date.now(),date:$('date').value,start:$('start').value,h:c.h,o:N($('ord').value),km:N($('km').value),g:c.g,fuel:c.fuel,ex:c.ex,net:c.net});
 persist();reset();toast(ok?'Shift saved ✓':'Saved, but this browser blocks storage')};
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x==b));
@@ -104,9 +124,9 @@ function hist(){const el=$('hist');
 if(!S.length){el.innerHTML='<div class="card"><h2>History</h2><p class="mut">No shifts yet. Save your first one from the New shift tab.</p></div>'+bk();bkw();return}
 const rows=S.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id).map(s=>`<div class="row"><div><b>${fd(s.date)}</b><span class="mut">${s.h}h · ${s.o} orders · ${s.km} km</span></div><div class="r"><b class="${s.net<0?'ng':'ps'}">${inr(s.net)}</b><span class="mut">${inr(s.net/s.h)}/hr</span></div><button data-d="${s.id}">${pend==s.id?'Sure?':'✕'}</button></div>`).join('');
 el.innerHTML='<div class="card"><h2>History</h2>'+rows+(ok?'':'<p class="mut">Storage is blocked here, so shifts will not be kept after you close this page.</p>')+'</div>'+bk();bkw();
-el.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{const id=+b.dataset.d;if(pend==id){S=S.filter(s=>s.id!=id);pend=null;persist();hist();toast('Deleted')}else{pend=id;hist();setTimeout(()=>{if(pend==id){pend=null;hist()}},3000)}})}
-const bk=()=>`<div class="card"><h2>Backup</h2><p class="mut">Your shifts live only on this phone. Copy a backup now and then, and paste it somewhere safe like Notes.</p><button class="btn alt" id="bc">Copy backup</button><label for="br">Restore from backup</label><textarea id="br" rows="3" placeholder="Paste your backup here"></textarea><button class="btn alt" id="bs">Restore</button></div>`;
-function bkw(){$('bc').onclick=async()=>{const t=JSON.stringify({v:2,S,C,R});try{await navigator.clipboard.writeText(t);toast('Backup copied ✓')}catch(e){$('br').value=t;$('br').select();toast('Select all and copy the text')}};
+el.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{const id=+b.dataset.d;if(pend==id){S=S.filter(s=>s.id!=id);D.s.push(id);pend=null;persist();hist();toast('Deleted')}else{pend=id;hist();setTimeout(()=>{if(pend==id){pend=null;hist()}},3000)}})}
+const bk=()=>`<div class="card"><h2>Backup</h2><p class="mut">Logged in as <b>${esc(window.slUser||"")}</b></p><button class="btn alt" id="lo" style="margin:0 0 12px">Log out</button><p class="mut">Your shifts live only on this phone. Copy a backup now and then, and paste it somewhere safe like Notes.</p><button class="btn alt" id="bc">Copy backup</button><label for="br">Restore from backup</label><textarea id="br" rows="3" placeholder="Paste your backup here"></textarea><button class="btn alt" id="bs">Restore</button></div>`;
+function bkw(){let lp=0;$('lo').onclick=e=>{if(!lp){lp=1;e.target.textContent='Tap again to log out';setTimeout(()=>{lp=0;e.target.textContent='Log out'},3000);return}window.slOut&&window.slOut()};$('bc').onclick=async()=>{const t=JSON.stringify({v:2,S,C,R});try{await navigator.clipboard.writeText(t);toast('Backup copied ✓')}catch(e){$('br').value=t;$('br').select();toast('Select all and copy the text')}};
 $('bs').onclick=()=>{try{const d=JSON.parse($('br').value.trim());if(!Array.isArray(d.S))throw 0;const ids=new Set(S.map(x=>x.id));let n=0;d.S.forEach(x=>{if(x&&x.date&&x.h>0&&Number.isFinite(x.net)&&!ids.has(x.id)){S.push(x);ids.add(x.id);n++}});if(Array.isArray(d.R)){const rid=new Set(R.map(x=>x.id));d.R.forEach(x=>{if(x&&x.id&&!rid.has(x.id)){R.push(x);rid.add(x.id)}})}persist();hist();toast(n+' shift'+(n==1?'':'s')+' restored')}catch(e){toast('That backup text looks wrong')}}}
 const esc=v=>String(v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const rrow=x=>`<div class="rt" data-i="${x.id}"><input data-f="n" value="${esc(x.n)}" placeholder="Name"><input data-f="a" list="areas" value="${esc(x.a)}" placeholder="Area"><input data-f="r" type="number" min="0" inputmode="numeric" value="${esc(x.r)}" placeholder="0"><input data-f="o" type="number" min="0" inputmode="numeric" value="${esc(x.o)}" placeholder="0"><button data-x="${x.id}">✕</button></div>`;
@@ -114,11 +134,11 @@ const dl=()=>{const a=[...new Set(R.map(x=>(x.a||'').trim()).filter(Boolean))];$
 let rp=null;
 function rest(){const el=$('rest');
 el.innerHTML=`<div class="card"><h2>Restaurants</h2><div class="rt hd"><span>Name</span><span>Area</span><span>NOR</span><span>NOO</span><span></span></div>${R.map(rrow).join('')}<datalist id="areas"></datalist><button class="btn" id="radd">+ Add restaurant</button><p class="mut" style="margin:12px 0 0">NOR = number of reviews on Swiggy. NOO = orders you got from that restaurant.</p></div>`;dl();
-el.oninput=e=>{const f=e.target.dataset.f;if(!f)return;const x=R.find(y=>y.id==e.target.closest('[data-i]').dataset.i);if(x){x[f]=e.target.value;persist()}};
+el.oninput=e=>{const f=e.target.dataset.f;if(!f)return;const x=R.find(y=>y.id==e.target.closest('[data-i]').dataset.i);if(x){x[f]=e.target.value;x.u=Date.now();persist()}};
 el.onchange=e=>{if(e.target.dataset.f=='a')dl()};
 el.onclick=e=>{const b=e.target.closest('[data-x]');
-if(b){const id=+b.dataset.x;if(rp==id){R=R.filter(x=>x.id!=id);rp=null;persist();rest();toast('Deleted')}else{rp=id;el.querySelectorAll('[data-x]').forEach(z=>z.classList.toggle('sure',z==b));setTimeout(()=>{if(rp==id){rp=null;b.classList.remove('sure')}},3000)}return}
-if(e.target.id=='radd'){R.push({id:Date.now(),n:'',a:'',r:'',o:''});persist();rest();const q=el.querySelectorAll('[data-f=n]');q[q.length-1].focus()}}}
+if(b){const id=+b.dataset.x;if(rp==id){R=R.filter(x=>x.id!=id);D.r.push(id);rp=null;persist();rest();toast('Deleted')}else{rp=id;el.querySelectorAll('[data-x]').forEach(z=>z.classList.toggle('sure',z==b));setTimeout(()=>{if(rp==id){rp=null;b.classList.remove('sure')}},3000)}return}
+if(e.target.id=='radd'){R.push({id:Date.now(),u:Date.now(),n:'',a:'',r:'',o:''});persist();rest();const q=el.querySelectorAll('[data-f=n]');q[q.length-1].focus()}}}
 function restCharts(){const rs=R.filter(x=>(x.n||'').trim()&&N(x.o)>0).map(x=>({n:x.n.trim(),a:(x.a||'').trim(),o:N(x.o)}));
 if(!rs.length)return '<div class="card"><h2>Best restaurant</h2><p class="mut">Add restaurants and your NOO numbers in the Restaurants tab to see this and the Best area chart.</p></div>';
 const rt=rs.slice().sort((a,b)=>b.o-a.o).slice(0,5),am={};
@@ -157,4 +177,81 @@ el.innerHTML=`<div class="card"><h2>Profit</h2><div class="seg">${[['d','Daily']
 ${restCharts()}<div class="card"><div class="g2"><div class="st"><span>Total net</span><b class="${tn<0?'ng':'ps'}">${inr(tn)}</b></div><div class="st"><span>Avg net / hour</span><b>${inr(th?tn/th:0)}</b></div><div class="st"><span>Shifts</span><b>${S.length}</b></div><div class="st"><span>Hours worked</span><b>${+th.toFixed(1)}</b></div></div>
 ${S.length<10?`<div class="tip">You have ${S.length} shift${S.length>1?'s':''} saved. Best hour and best day get reliable after about 10 or more shifts, so treat them as a rough guide for now.</div>`:''}</div>`;
 el.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{per=b.dataset.p;ins()})}
-</script></body></html>
+
+const cfg={apiKey:"AIzaSyCTJhXzPTggBk6nLGGtZxm9Jazo5Jd88PE",authDomain:"shiftledger123.firebaseapp.com",projectId:"shiftledger123",storageBucket:"shiftledger123.firebasestorage.app",messagingSenderId:"760096777872",appId:"1:760096777872:web:381ab619bc5bdc1d5a1a15"};
+let auth,db;
+const setSt=t=>{$('st').textContent=t},cur=()=>({S,R,C,D});
+const norm=p=>({S:p.S||[],R:p.R||[],C:p.C||{},D:{s:(p.D&&p.D.s)||[],r:(p.D&&p.D.r)||[]}});
+function merge(a,b){const ds=[...new Set([...a.D.s,...b.D.s])].sort((x,y)=>x-y),dr=[...new Set([...a.D.r,...b.D.r])].sort((x,y)=>x-y),xs=new Set(ds),xr=new Set(dr);
+const mS=new Map();[...b.S,...a.S].forEach(x=>{if(x&&!xs.has(x.id)&&!mS.has(x.id))mS.set(x.id,x)});
+const mR=new Map();[...b.R,...a.R].forEach(x=>{if(!x||xr.has(x.id))return;const o=mR.get(x.id);if(!o||(x.u||0)>(o.u||0)||((x.u||0)==(o.u||0)&&JSON.stringify(x)>JSON.stringify(o)))mR.set(x.id,x)});
+const C=(Object.keys(b.C).length&&(b.C.u||0)>(a.C.u||0))||!Object.keys(a.C).length?b.C:a.C;
+return{S:[...mS.values()].sort((x,y)=>x.id-y.id),R:[...mR.values()].sort((x,y)=>x.id-y.id),C,D:{s:ds,r:dr}}}
+function apply(m){S=m.S;R=m.R;C=Object.assign({pp:105,mil:45,mt:20},m.C);D=m.D;saveLocal();
+const a=document.activeElement,ty=a&&a.tagName=='INPUT';
+if(!(ty&&a.closest('#new'))){$('pp').value=C.pp;$('mil').value=C.mil;$('mt').value=C.mt;render()}
+const v=['rest','hist','ins'].find(k=>!$(k).hidden);if(v&&!(ty&&v=='rest'))({rest,hist,ins})[v]()}
+function push(){if(!U||!db)return;setSt('Syncing…');clearTimeout(pt);pt=setTimeout(()=>doPush(),700)}
+function doPush(m){if(!U||!db)return Promise.resolve();const p=m||merge(cur(),norm({}));
+return db.collection('users').doc(U.uid).set({d:JSON.stringify(p),t:Date.now()}).then(()=>setSt('✓ Synced')).catch(()=>setSt('Not synced'))}
+function stopSync(){if(unsub){unsub();unsub=null}}
+function startSync(){stopSync();setSt('Syncing…');
+unsub=db.collection('users').doc(U.uid).onSnapshot(sn=>{if(sn.metadata.hasPendingWrites)return;
+let r;try{r=norm(sn.exists?JSON.parse(sn.data().d):{})}catch(e){r=norm({})}
+const m=merge(cur(),r);
+if(JSON.stringify(m)!==JSON.stringify(merge(cur(),norm({}))))apply(m);
+if(JSON.stringify(m)!==JSON.stringify(merge(r,norm({}))))doPush(m);else setSt('✓ Synced')},()=>setSt('Offline'))}
+addEventListener('offline',()=>setSt('Offline'));addEventListener('online',()=>push());
+const msg=c=>({'auth/email-already-in-use':'This ID is taken. Pick another, or log in.','auth/invalid-credential':'Wrong ID or password.','auth/wrong-password':'Wrong ID or password.','auth/user-not-found':'Wrong ID or password.','auth/invalid-login-credentials':'Wrong ID or password.','auth/weak-password':'Password needs at least 6 characters.','auth/network-request-failed':'No internet connection.','auth/too-many-requests':'Too many tries. Wait a few minutes.','auth/operation-not-allowed':'Email/Password login is not enabled in Firebase.','auth/unauthorized-domain':'This web address is not allowed in Firebase.'}[c]||'Something went wrong ('+c+').');
+const aerr=t=>{const e=$('aerr');e.textContent=t;e.hidden=!t};
+async function go(mode){const id=$('uid').value.trim().toLowerCase(),pw=$('pw').value;
+if(!/^[a-z0-9._-]{3,30}$/.test(id))return aerr('ID: 3 to 30 letters, numbers, dot, dash or underscore.');
+if(pw.length<6)return aerr('Password needs at least 6 characters.');
+aerr('');$('login').disabled=$('signup').disabled=true;
+try{const e=id+'@shiftledger.app';mode=='in'?await auth.signInWithEmailAndPassword(e,pw):await auth.createUserWithEmailAndPassword(e,pw)}catch(e){aerr(msg(e.code))}
+$('login').disabled=$('signup').disabled=false}
+$('login').onclick=()=>go('in');$('signup').onclick=()=>go('up');
+let lo=false;
+$('out').onclick=async()=>{if(!lo){lo=true;$('out').textContent='Sure?';setTimeout(()=>{lo=false;$('out').textContent='Log out'},3000);return}
+lo=false;$('out').textContent='Log out';
+if(auth){await Promise.race([doPush(),new Promise(r=>setTimeout(r,3000))]);
+S=[];R=[];D={s:[],r:[]};C={pp:105,mil:45,mt:20};try{['sl_s','sl_c','sl_r','sl_d'].forEach(k=>localStorage.removeItem(k))}catch(e){}
+$('pp').value=C.pp;$('mil').value=C.mil;$('mt').value=C.mt;reset();await auth.signOut()}};
+function showApp(on){$('boot').hidden=true;$('app').hidden=!on;$('auth').hidden=on}
+try{firebase.initializeApp(cfg);auth=firebase.auth();db=firebase.firestore();
+auth.onAuthStateChanged(u=>{U=u;if(u){$('who').textContent=u.email.split('@')[0];showApp(true);startSync()}else{stopSync();showApp(false)}})}
+catch(e){showApp(true);$('who').textContent='Offline mode';setSt('Not synced')}
+</script><script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import{getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut}from"https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import{getFirestore,doc,getDoc,setDoc}from"https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const g=i=>document.getElementById(i),app=initializeApp({apiKey:"AIzaSyCTJhXzPTggBk6nLGGtZxm9Jazo5Jd88PE",authDomain:"shiftledger123.firebaseapp.com",projectId:"shiftledger123",storageBucket:"shiftledger123.firebasestorage.app",messagingSenderId:"760096777872",appId:"1:760096777872:web:381ab619bc5bdc1d5a1a15"}),auth=getAuth(app),db=getFirestore(app);
+let uid=null,tm=null;
+const cl=id=>id.toLowerCase().replace(/[^a-z0-9._-]/g,''),em=id=>cl(id)+'@shiftledger.app';
+const err=t=>{g('ae').textContent=t},busy=b=>{g('ali').disabled=g('acr').disabled=!!b};
+const msg=c=>({'auth/invalid-credential':'Wrong ID or password','auth/wrong-password':'Wrong ID or password','auth/user-not-found':'Wrong ID or password','auth/email-already-in-use':'That ID is taken, try another','auth/weak-password':'Password needs 6+ characters','auth/network-request-failed':'No internet connection','auth/too-many-requests':'Too many tries, wait a minute'}[c]||'Something went wrong ('+c+')');
+const tmo=(p,ms)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),ms))]);
+const T=()=>+localStorage.getItem('sl_t')||0;
+const push=()=>{if(!T())localStorage.setItem('sl_t',String(Date.now()));return tmo(setDoc(doc(db,'users',uid),{data:JSON.stringify(slGet()),t:T()}),8000)};
+async function pull(){
+const sn=await tmo(getDoc(doc(db,'users',uid)),8000),L=slGet(),lt=T(),prev=localStorage.getItem('sl_uid'),known=prev==uid;
+if(!sn.exists())await push();
+else{const ct=sn.data().t||0,c=JSON.parse(sn.data().data);
+if(!known){const m={S:[...c.S||[]],R:[...c.R||[]],C:c.C};
+if(!prev){const a=new Set(m.S.map(x=>x.id));(L.S||[]).forEach(x=>{if(!a.has(x.id))m.S.push(x)});const b=new Set(m.R.map(x=>x.id));(L.R||[]).forEach(x=>{if(!b.has(x.id))m.R.push(x)})}
+slSet(m,Math.max(ct,lt)+1);await push()}
+else if(ct>lt)slSet(c,ct);else if(lt>ct)await push()}
+localStorage.setItem('sl_uid',uid)}
+const go=async c=>{const id=g('aid').value,pw=g('apw').value;if(cl(id).length<3)return err('ID needs at least 3 letters or numbers');if(pw.length<6)return err('Password needs 6+ characters');err('');busy(1);
+try{c?await createUserWithEmailAndPassword(auth,em(id),pw):await signInWithEmailAndPassword(auth,em(id),pw)}catch(e){err(msg(e.code))}busy(0)};
+g('ali').onclick=()=>go(0);g('acr').onclick=()=>go(1);g('apw').onkeydown=e=>{if(e.key=='Enter')go(0)};
+onAuthStateChanged(auth,async u=>{window.slReady=true;
+if(!u){uid=null;g('am').textContent='Log in to keep your shifts in sync on all your devices.';g('af').hidden=false;g('auth').hidden=false;slStatus('PRIVATE');return}
+uid=u.uid;window.slUser=(u.email||'').split('@')[0];g('af').hidden=true;g('am').textContent='Syncing your data…';g('auth').hidden=false;
+try{await pull();slStatus('SYNCED')}catch(e){slStatus('OFFLINE')}
+g('auth').hidden=true});
+window.slSync=()=>{if(!uid)return;clearTimeout(tm);slStatus('SYNCING…');tm=setTimeout(async()=>{try{await push();slStatus('SYNCED')}catch(e){slStatus('OFFLINE')}},800)};
+document.addEventListener('visibilitychange',async()=>{if(!document.hidden&&uid){try{await pull();slStatus('SYNCED')}catch(e){slStatus('OFFLINE')}}});
+window.slOut=async()=>{try{await push()}catch(e){}await signOut(auth);['sl_s','sl_c','sl_r','sl_t','sl_uid'].forEach(k=>localStorage.removeItem(k));location.reload()};
+</script>
+</body></html>
