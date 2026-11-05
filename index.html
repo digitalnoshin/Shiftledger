@@ -224,8 +224,8 @@ catch(e){showApp(true);$('who').textContent='Offline mode';setSt('Not synced')}
 </script><script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import{getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut}from"https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import{getFirestore,doc,getDoc,setDoc}from"https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-const g=i=>document.getElementById(i),app=initializeApp({apiKey:"AIzaSyCTJhXzPTggBk6nLGGtZxm9Jazo5Jd88PE",authDomain:"shiftledger123.firebaseapp.com",projectId:"shiftledger123",storageBucket:"shiftledger123.firebasestorage.app",messagingSenderId:"760096777872",appId:"1:760096777872:web:381ab619bc5bdc1d5a1a15"}),auth=getAuth(app),db=getFirestore(app);
+import{initializeFirestore,doc,getDoc,setDoc}from"https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const g=i=>document.getElementById(i),app=initializeApp({apiKey:"AIzaSyCTJhXzPTggBk6nLGGtZxm9Jazo5Jd88PE",authDomain:"shiftledger123.firebaseapp.com",projectId:"shiftledger123",storageBucket:"shiftledger123.firebasestorage.app",messagingSenderId:"760096777872",appId:"1:760096777872:web:381ab619bc5bdc1d5a1a15"}),auth=getAuth(app),db=initializeFirestore(app,{experimentalForceLongPolling:true});
 let uid=null,tm=null;
 const cl=id=>id.toLowerCase().replace(/[^a-z0-9._-]/g,''),em=id=>cl(id)+'@shiftledger.app';
 const err=t=>{g('ae').textContent=t},busy=b=>{g('ali').disabled=g('acr').disabled=!!b};
@@ -248,8 +248,9 @@ g('ali').onclick=()=>go(0);g('acr').onclick=()=>go(1);g('apw').onkeydown=e=>{if(
 onAuthStateChanged(auth,async u=>{window.slReady=true;
 if(!u){uid=null;g('am').textContent='Log in to keep your shifts in sync on all your devices.';g('af').hidden=false;g('auth').hidden=false;slStatus('PRIVATE');return}
 uid=u.uid;window.slUser=(u.email||'').split('@')[0];g('af').hidden=true;g('am').textContent='Syncing your data…';g('auth').hidden=false;
-try{await pull();slStatus('SYNCED')}catch(e){slStatus('OFFLINE')}
-g('auth').hidden=true});
+const cap=setTimeout(()=>{g('auth').hidden=true;slStatus('OFFLINE')},12000);
+try{await pull();slStatus('SYNCED')}catch(e){slStatus('OFFLINE');toast('Sync problem: '+(e.code||e.message))}
+clearTimeout(cap);g('auth').hidden=true});
 window.slSync=()=>{if(!uid)return;clearTimeout(tm);slStatus('SYNCING…');tm=setTimeout(async()=>{try{await push();slStatus('SYNCED')}catch(e){slStatus('OFFLINE')}},800)};
 document.addEventListener('visibilitychange',async()=>{if(!document.hidden&&uid){try{await pull();slStatus('SYNCED')}catch(e){slStatus('OFFLINE')}}});
 window.slOut=async()=>{try{await push()}catch(e){}await signOut(auth);['sl_s','sl_c','sl_r','sl_t','sl_uid'].forEach(k=>localStorage.removeItem(k));location.reload()};
